@@ -1,0 +1,10 @@
+{
+  "868": {
+    "version": "4.1.9",
+    "url": "https://github.com/floatAsNeeded/meteostazionefirmware/releases/download/v4.1.9/meteostazionefirmware_receiver_868.ino.bin"
+  },
+  "915": {
+    "version": "4.1.7",
+    "url": "https://github.com/floatAsNeeded/meteostazionefirmware/releases/download/v4.1.7/meteostazionefirmware_receiver_915.ino.bin"
+  }
+}
