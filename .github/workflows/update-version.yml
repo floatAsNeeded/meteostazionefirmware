@@ -11,7 +11,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          ref: main # Explicitly check out the main branch
+
+      - name: Debug git status
+        run: |
+          git status
+          git remote -v
+          git branch -a
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
 
       - name: Extract version from tag
         id: tag
@@ -28,6 +37,10 @@ jobs:
 
       - name: Parse assets and update JSON
         run: |
+          # Ensure version.json exists
+          if [ ! -f version.json ]; then
+            echo '{"868":{"version":"0.0.0","url":""},"915":{"version":"0.0.0","url":""}}' > version.json
+          fi
           # Read current version.json
           current_json=$(cat version.json)
           
@@ -67,5 +80,6 @@ jobs:
         with:
           commit_message: "Update version.json for release ${{ steps.tag.outputs.tag }}"
           file_pattern: version.json
+          branch: main # Ensure this matches your default branch
 
 
