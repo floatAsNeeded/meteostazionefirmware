@@ -11,8 +11,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: main # Check out the main branch
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main # Explicitly check out main branch
 
       - name: Debug git status
         run: |
@@ -76,13 +76,13 @@ jobs:
           else
             echo "No changes to version.json"
             rm version.json.new
+            exit 0 # Exit early if no changes
           fi
 
-      - name: Commit updated version.json
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update version.json for release ${{ steps.tag.outputs.tag }}"
-          file_pattern: version.json
-          branch: main # Target main branch for push
+      - name: Commit and push changes
+        run: |
+          git add version.json
+          git commit -m "Update version.json for release ${{ steps.tag.outputs.tag }}"
+          git push origin main
 
 
