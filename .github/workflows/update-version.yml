@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          ref: main # Explicitly check out the main branch
+          ref: main # Check out the main branch
 
       - name: Debug git status
         run: |
@@ -58,8 +58,11 @@ jobs:
             exit 1
           fi
           
+          # Clean version (remove 'v' prefix if present)
+          version_clean=$(echo "${{ steps.tag.outputs.tag }}" | sed 's/^v//')
+          
           # Update JSON with new version and URLs
-          jq --arg version "${{ steps.tag.outputs.tag }}" \
+          jq --arg version "$version_clean" \
              --arg url868 "$url_868" \
              --arg url915 "$url_915" \
              '.["868"].version = $version | .["868"].url = $url868 | .["915"].version = $version | .["915"].url = $url915' \
@@ -80,6 +83,6 @@ jobs:
         with:
           commit_message: "Update version.json for release ${{ steps.tag.outputs.tag }}"
           file_pattern: version.json
-          branch: main # Ensure this matches your default branch
+          branch: main # Target main branch for push
 
 
