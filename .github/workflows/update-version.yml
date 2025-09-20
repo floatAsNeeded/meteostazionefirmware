@@ -1,0 +1,44 @@
+name: Update version.json
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js (for JSON editing)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Update version.json
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Release tag: $TAG_NAME"
+
+          # Read existing JSON
+          VERSION_FILE="version.json"
+          JSON=$(cat $VERSION_FILE)
+
+          # Use jq to update both entries
+          JSON=$(echo "$JSON" | jq --arg ver "$TAG_NAME" \
+            '.["868"].version=$ver | .["868"].url="https://github.com/${{ github.repository }}/releases/download/\($ver)/meteostazionefirmware_receiver_868.ino.bin" | 
+             .["915"].version=$ver | .["915"].url="https://github.com/${{ github.repository }}/releases/download/\($ver)/meteostazionefirmware_receiver_915.ino.bin"')
+
+          echo "$JSON" > $VERSION_FILE
+
+          cat $VERSION_FILE
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add version.json
+          git commit -m "Update version.json for $GITHUB_REF"
+          git push
