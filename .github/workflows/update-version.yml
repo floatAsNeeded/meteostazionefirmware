@@ -1,47 +1,71 @@
-name: Update version.json
+name: Update version.json on Release
 
 on:
   release:
     types: [published]
 
 jobs:
-  update-version:
+  update-json:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # allow pushing changes
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
+      - name: Extract version from tag
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Update version.json
+      - name: Get release assets
+        id: assets
         run: |
-          TAG_NAME=${{ github.event.release.tag_name }}
-          echo "Release tag: $TAG_NAME"
+          assets_json=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.tag.outputs.tag }}")
+          echo "assets_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$assets_json" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          VERSION_FILE="version.json"
-          JSON=$(cat $VERSION_FILE)
-
-          JSON=$(echo "$JSON" | jq --arg ver "$TAG_NAME" \
-            '.["868"].version=$ver 
-             | .["868"].url="https://github.com/${{ github.repository }}/releases/download/\($ver)/meteostazionefirmware_receiver_868.ino.bin" 
-             | .["915"].version=$ver 
-             | .["915"].url="https://github.com/${{ github.repository }}/releases/download/\($ver)/meteostazionefirmware_receiver_915.ino.bin"')
-
-          echo "$JSON" > $VERSION_FILE
-          cat $VERSION_FILE
-
-      - name: Commit and push changes
+      - name: Parse assets and update JSON
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add version.json
-          git commit -m "Update version.json for $TAG_NAME" || echo "No changes to commit"
-          git push
+          # Read current version.json
+          current_json=$(cat version.json)
+          
+          # Extract URLs for assets
+          url_868=$(echo "${{ steps.assets.outputs.assets_json }}" | jq -r '.assets[] | select(.name == "meteostazionefirmware_receiver_868.ino.bin") | .browser_download_url // empty')
+          url_915=$(echo "${{ steps.assets.outputs.assets_json }}" | jq -r '.assets[] | select(.name == "meteostazionefirmware_receiver_915.ino.bin") | .browser_download_url // empty')
+          
+          # Use current URLs if assets are missing
+          url_868=${url_868:-$(echo "$current_json" | jq -r '.["868"].url')}
+          url_915=${url_915:-$(echo "$current_json" | jq -r '.["915"].url')}
+          
+          # Validate at least one URL is present
+          if [ -z "$url_868" ] && [ -z "$url_915" ]; then
+            echo "Error: No assets found for 868 or 915 in release ${{ steps.tag.outputs.tag }}"
+            exit 1
+          fi
+          
+          # Update JSON with new version and URLs
+          jq --arg version "${{ steps.tag.outputs.tag }}" \
+             --arg url868 "$url_868" \
+             --arg url915 "$url_915" \
+             '.["868"].version = $version | .["868"].url = $url868 | .["915"].version = $version | .["915"].url = $url915' \
+             version.json > version.json.new
+          
+          # Check if JSON changed
+          if ! cmp -s version.json version.json.new; then
+            mv version.json.new version.json
+            echo "Updated version.json:"
+            cat version.json
+          else
+            echo "No changes to version.json"
+            rm version.json.new
+          fi
+
+      - name: Commit updated version.json
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update version.json for release ${{ steps.tag.outputs.tag }}"
+          file_pattern: version.json
 
 
